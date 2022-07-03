@@ -12,7 +12,7 @@ class ElementControl {
     }
 
     toggleIcon() {
-        const iconRefs = this.elementRefs.querySelectorAll('svg');
+        const iconRefs = this.elementRefs.querySelectorAll('img');
         iconRefs.forEach(icon => icon.classList.toggle('is-hidden'));
         return this;
     }
