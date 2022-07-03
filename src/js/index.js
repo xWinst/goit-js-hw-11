@@ -1,125 +1,73 @@
-import fetchImages from './fetchImages';
+import refs from './elementRefs';
+import FetchImages from './fetchImages';
+import ElementControl from './elementControl';
+import createHTML from './crateHTML';
 import { Notify } from 'notiflix/build/notiflix-notify-aio';
+import SimpleLightbox from 'simplelightbox';
+import 'simplelightbox/dist/simple-lightbox.min.css';
 
-const ref = {
-    form: document.querySelector('#search-form'),
-    gallery: document.querySelector('.gallery'),
-};
+const lightbox = new SimpleLightbox('.gallery a');
+const fetcher = new FetchImages();
+const searchBtn = new ElementControl(refs.searchBtn);
+const loadMoreBtn = new ElementControl(refs.loadMoreBtn);
+const messageAboutEnd = new ElementControl(refs.messageAboutEnd);
 
-console.log('11111111111111111111111111111111111111');
+let data;
 
-ref.form.addEventListener('submit', searchImage);
+refs.form.addEventListener('submit', searchImage);
+refs.loadMoreBtn.addEventListener('click', getImages);
 
 async function searchImage(event) {
     event.preventDefault();
-    let query = ref.form.searchQuery.value.trim();
-    console.log(query);
+    const query = refs.form.searchQuery.value.trim();
     if (query) {
-        try {
-            const data = await fetchImages(query);
-            console.log(data);
-            renderList(data.data.hits);
-        } catch (error) {
-            console.log(error);
-        }
+        searchBtn.toggleIcon().disable();
+        clearGallery();
+        fetcher.query = query;
+        await getImages();
+        searchBtn.toggleIcon().enable();
     }
 }
 
-function renderList(data) {
-    const result = data
-        .map(
-            ({
-                webformatURL,
-                largeImageURL,
-                tags,
-                likes,
-                views,
-                comments,
-                downloads,
-            }) =>
-                `<div class="photo-card">
-                    <img src="${webformatURL}" alt="${tags}" loading="lazy" />
-                    <div class="info">
-                        <p class="info-item">
-                            <b>Likes</b>
-                            </br>${likes}
-                        </p>
-                        <p class="info-item">
-                            <b>Views</b>
-                            </br>${views}
-                        </p>
-                        <p class="info-item">
-                            <b>Comments</b>
-                            </br>${comments}
-                        </p>
-                        <p class="info-item">
-                            <b>Downloads</b>
-                            </br>${downloads}
-                        </p>
-                    </div>
-                </div>`
-        )
-        .join('');
-    ref.gallery.insertAdjacentHTML('beforeend', result);
+function clearGallery() {
+    messageAboutEnd.hide();
+    loadMoreBtn.hide();
+    refs.gallery.innerHTML = '';
 }
 
-// function renderCountryData(countryData) {
-//     if (countryData.length > 10) {
-//         Notify.info(
-//             'Too many matches found. Please enter a more specific name.'
-//         );
-//         return;
-//     }
+async function getImages() {
+    loadMoreBtn.toggleIcon().disable();
+    loadMoreBtn.setText('Loading');
+    try {
+        data = await fetcher.fetch();
+    } catch (error) {
+        console.log('ERROR = ', error);
+    }
+    if (data.totalHits) {
+        renderGallery(data.hits);
+        loadMoreBtn.setText('Load more');
+        loadMoreBtn.toggleIcon().enable();
+        if (fetcher.page === 2) {
+            Notify.success(`Hooray! We found ${data.totalHits} images.`);
+        } else {
+            window.scrollBy({
+                top: window.innerHeight - 168,
+                behavior: 'smooth',
+            });
+        }
+        if (data.isEnd) {
+            messageAboutEnd.show();
+            loadMoreBtn.hide();
+        }
+    } else {
+        Notify.failure(
+            'Sorry, there are no images matching your search query. Please try again.'
+        );
+    }
+}
 
-//     if (countryData.length > 1) {
-//         ref.countryList.innerHTML = createList(countryData);
-//     } else {
-//         ref.countryInfo.innerHTML = createInfo(countryData[0]);
-//     }
-// }
-
-// function searchError(error) {
-//     console.log(error);
-//     Notify.failure('Oops, there is no country with that name');
-// }
-
-// function reset() {
-//     ref.countryInfo.innerHTML = '';
-//     ref.countryList.innerHTML = '';
-// }
-
-// function createList(countries) {
-//     const result = countries
-//         .map(
-//             ({ name, flags }) =>
-//                 `<li class="item">
-//                 <img alt = "${name.common} flag" src = "${flags.svg}" width="50">
-//                 <span>${name.common}</span>
-//             </li>`
-//         )
-//         .join('');
-//     return result;
-// }
-
-// function createInfo(country) {
-//     const { name, flags, capital, population, languages } = country;
-//     const langs = Object.values(languages);
-//     return `<div class=thumb>
-//                 <img alt = "${name.common} flag"
-//                     src = "${flags.svg}"
-//                     width="100">
-//                 <span>${name.common}</span>
-//             </div>
-//             <p class="prop">Official name:
-//                 <span>${name.official}</span>
-//             </p>
-//             <p class="prop">Capital:
-//                 <span>${capital}</span>
-//             </p>
-//             <p class="prop">Population:
-//                 <span>${population}</span>
-//             </p>
-//             <p class="prop">Langueges:
-//                 <span>${langs.toString().replaceAll(',', ', ')}</span>
-//             </p>`;
-// }
+function renderGallery(data) {
+    refs.gallery.insertAdjacentHTML('beforeend', createHTML(data));
+    loadMoreBtn.show();
+    lightbox.refresh();
+}
